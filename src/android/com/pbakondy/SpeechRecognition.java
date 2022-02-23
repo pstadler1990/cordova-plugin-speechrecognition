@@ -1,4 +1,5 @@
 // https://developer.android.com/reference/android/speech/SpeechRecognizer.html
+// Improved version (patrick.stadler@dfki.de) for proper partial result handling
 
 package com.pbakondy;
 
@@ -10,6 +11,7 @@ import org.apache.cordova.PluginResult;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import android.app.Activity;
 import android.content.Context;
@@ -30,6 +32,7 @@ import android.view.View;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+
 
 public class SpeechRecognition extends CordovaPlugin {
 
@@ -292,13 +295,23 @@ public class SpeechRecognition extends CordovaPlugin {
     public void onPartialResults(Bundle bundle) {
       ArrayList<String> matches = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
       Log.d(LOG_TAG, "SpeechRecognitionListener partialResults: " + matches);
+
+      JSONObject jsonObject = new JSONObject();
       JSONArray matchesJSON = new JSONArray(matches);
       try {
         if (matches != null
                 && matches.size() > 0
-                        && !mLastPartialResults.equals(matchesJSON)) {
+                && !mLastPartialResults.equals(matchesJSON)) {
           mLastPartialResults = matchesJSON;
-          PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, matchesJSON);
+
+          try {
+            jsonObject.put("isPartial", true);
+            jsonObject.put("results", matchesJSON);
+          } catch (JSONException e) {
+            e.printStackTrace();
+          }
+
+          PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, jsonObject);
           pluginResult.setKeepCallback(true);
           callbackContext.sendPluginResult(pluginResult);
         }
@@ -318,8 +331,14 @@ public class SpeechRecognition extends CordovaPlugin {
       ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
       Log.d(LOG_TAG, "SpeechRecognitionListener results: " + matches);
       try {
+        JSONObject jsonObject = new JSONObject();
+
         JSONArray jsonMatches = new JSONArray(matches);
-        callbackContext.success(jsonMatches);
+
+        jsonObject.put("isPartial", false);
+        jsonObject.put("results", jsonMatches);
+
+        callbackContext.success(jsonObject);
       } catch (Exception e) {
         e.printStackTrace();
         callbackContext.error(e.getMessage());
